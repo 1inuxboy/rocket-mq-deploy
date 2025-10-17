@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # NameServer服务
+  namesrv:
+    image: apache/rocketmq:4.9.7
+    container_name: rocketmq-namesrv
+    ports:
+      - "9876:9876"
+    volumes:
+      - /data/rocketmq-4.9.7/log/namesrv:/root/logs
+      - /data/rocketmq-4.9.7/data/namesrv:/root/store
+    command: sh mqnamesrv
+    networks:
+      - rocketmq-net
+    restart: unless-stopped
+  
+  # Broker服务
+  broker:
+    image: apache/rocketmq:4.9.7
+    container_name: rocketmq-broker
+    ports:
+      - "30911:30911"
+      - "10911:10911"
+    volumes:
+      - /data/rocketmq-4.9.7/log/broker:/root/logs
+      - /data/rocketmq-4.9.7/data/broker:/root/store
+      - ../rocketmq-conf/single-broker.conf:/opt/rocketmq-4.9.7/conf/single-broker.conf
+      - ../rocketmq-conf/plain-acl.conf:/opt/rocketmq-4.9.7/conf/plain-acl.conf
+    environment:
+      - NAMESRV_ADDR=namesrv:9876
+    command: sh mqbroker -c /opt/rocketmq-4.9.7/conf/single-broker.conf
+    depends_on:
+      - namesrv
+    networks:
+      - rocketmq-net
+    restart: unless-stopped
+
+networks:
+  rocketmq-net:
+    driver: bridge
