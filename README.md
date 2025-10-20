@@ -3,7 +3,7 @@
  * @Date                : 2025-10-20 15:52:35
  * @Description         : 
  * @Email               : lihang818@foxmail.com
- * @LastEditTime        : 2025-10-20 16:06:12
+ * @LastEditTime        : 2025-10-20 16:24:43
 -->
 ## 部署方式
 
@@ -40,5 +40,35 @@ ll
 ### 启动和测试
 
 ```bash
-./bin/mqbroker -c /opt/rocketmq-4.9.7/conf/acl.conf
+ln -sf /opt/rocketmq-4.9.7/bin/* /usr/local/bin/
+mqbroker -c /opt/rocketmq-4.9.7/conf/broker.conf 
+go run main.go
 ```
+
+> 使用systemctl管理，参考 `deploy/systemctl`
+
+```bash
+cat <<EOF > /etc/systemd/system/rocketmq-broker.service
+[Unit]
+Description=Apache RocketMQ Broker (Single Mode)
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rocketmq-4.9.7
+ExecStart=/opt/rocketmq-4.9.7/bin/mqbroker -c /opt/rocketmq-4.9.7/conf/broker.conf
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/data/logs/broker.log
+StandardError=append:/data/logs/broker.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable rocketmq-broker --now
+```
+
+## Docker 部署
