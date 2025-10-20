@@ -3,13 +3,13 @@ version: '3.8'
 services:
   # NameServer服务
   namesrv:
-    image: apache/rocketmq:4.9.7
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:4.9.7}
     container_name: rocketmq-namesrv
     ports:
-      - "9876:9876"
+      - "${NAMESRV_HOST_PORT:-19876}:${NAMESRV_CONTAINER_PORT:-9876}"
     volumes:
-      - /data/rocketmq-4.9.7/log/namesrv:/root/logs
-      - /data/rocketmq-4.9.7/data/namesrv:/root/store
+      - ${HOST_LOG_NAMESRV:-/data/rocketmq-4.9.7-docker/log/namesrv}:/root/logs
+      - ${HOST_DATA_NAMESRV:-/data/rocketmq-4.9.7-docker/data/namesrv}:/root/store
     command: sh mqnamesrv
     networks:
       - rocketmq-net
@@ -17,19 +17,20 @@ services:
   
   # Broker服务
   broker:
-    image: apache/rocketmq:4.9.7
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:4.9.7}
     container_name: rocketmq-broker
     ports:
-      - "30911:30911"
-      - "10911:10911"
+      - "${BROKER_PORT1_HOST:-20911}:${BROKER_PORT1_CONTAINER:-20911}"
+      - "${BROKER_PORT2_HOST:-20912}:${BROKER_PORT2_CONTAINER:-20912}"
+      - "${BROKER_PORT3_HOST:-20913}:${BROKER_PORT3_CONTAINER:-20913}"
     volumes:
-      - /data/rocketmq-4.9.7/log/broker:/root/logs
-      - /data/rocketmq-4.9.7/data/broker:/root/store
-      - ../rocketmq-conf/single-broker.conf:/opt/rocketmq-4.9.7/conf/single-broker.conf
-      - ../rocketmq-conf/plain-acl.conf:/opt/rocketmq-4.9.7/conf/plain-acl.conf
+      - ${HOST_LOG_BROKER:-/data/rocketmq-4.9.7-docker/log/broker}:/root/logs
+      - ${HOST_DATA_BROKER:-/data/rocketmq-4.9.7-docker/data/broker}:/root/store
+      - ${BROKER_CONF:-../rocketmq-conf/docker/broker.conf}:/opt/rocketmq-4.9.7/conf/broker.conf
+      - ${ACL_CONF:-../rocketmq-conf/docker/plain-acl.conf}:/opt/rocketmq-4.9.7/conf/plain-acl.conf
     environment:
-      - NAMESRV_ADDR=namesrv:9876
-    command: sh mqbroker -c /opt/rocketmq-4.9.7/conf/single-broker.conf
+      - NAMESRV_ADDR=${NAMESRV_ADDR_IN_BROKER:-namesrv:9876}
+    command: sh mqbroker -c /opt/rocketmq-4.9.7/conf/broker.conf
     depends_on:
       - namesrv
     networks:
