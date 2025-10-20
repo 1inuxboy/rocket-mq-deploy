@@ -28,7 +28,7 @@ func main() {
 	// 测试场景3：使用错误的账号信息
 	test_acl_wrong_credentials()
 
-	// 测试场景4：使用非管理员账号（根据plain-acl.conf，该账号对topicA只有DENY权限）
+	// 测试场景4：使用非管理员账号（根据plain-acl.conf，该账号对topicA和topic_plan_status_update只有DENY权限）
 	test_acl_normal_user()
 
 	select {}
@@ -161,7 +161,7 @@ func test_acl_normal_user() {
 
 	defer p.Shutdown()
 
-	// 根据plain-acl.conf，RocketMQ用户对topicA只有DENY权限
+	// 根据plain-acl.conf，RocketMQ用户对topicA和topic_plan_status_update只有DENY权限
 	result, err := p.SendSync(context.Background(), &primitive.Message{
 		Topic: "topicA",
 		Body:  []byte("Hello from normal user to denied topic!"),
@@ -170,6 +170,17 @@ func test_acl_normal_user() {
 		fmt.Printf("发送到topicA失败(预期行为): %s\n", err)
 	} else {
 		fmt.Printf("发送到topicA成功(非预期行为): %s\n", result.String())
+	}
+
+	// 测试发送到topic_plan_status_update（也应该被拒绝）
+	result, err = p.SendSync(context.Background(), &primitive.Message{
+		Topic: "topic_plan_status_update",
+		Body:  []byte("Hello from normal user to denied topic_plan_status_update!"),
+	})
+	if err != nil {
+		fmt.Printf("发送到topic_plan_status_update失败(预期行为): %s\n", err)
+	} else {
+		fmt.Printf("发送到topic_plan_status_update成功(非预期行为): %s\n", result.String())
 	}
 
 	// 尝试发送到有权限的topicB
