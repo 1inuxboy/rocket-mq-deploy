@@ -2,7 +2,7 @@
  * @Author              : Lihang
  * @Email               : lihang818@foxmail.com
  * @Date                : 2025-10-10 15:47:43
- * @LastEditTime        : 2025-10-20 14:20:08
+ * @LastEditTime        : 2025-10-22 14:25:20
  * @Description         :
  */
 package main
@@ -11,18 +11,34 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/apache/rocketmq-client-go/v2/producer"
+	"github.com/apache/rocketmq-client-go/v2/rlog"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	testResults = make(map[string]bool) // 存储测试结果
+	testResults       = make(map[string]bool) // 存储测试结果
+	rocketmqNameServ  []string                // RocketMQ NameServer 地址列表
+	adminCredentials  primitive.Credentials   // 管理员凭证
+	readerCredentials primitive.Credentials   // 普通用户凭证
 )
 
 func main() {
+	// 完全禁用RocketMQ客户端内部日志
+	os.Setenv("rocketmq.client.logLevel", "OFF")
+	os.Setenv("rocketmq.client.logRoot", "/dev/null")
+	os.Setenv("rocketmq.client.logFileMaxSize", "0")
+	os.Setenv("rocketmq.client.logFileMaxIndex", "0")
+	os.Setenv("rocketmq.client.logUseSlf4j", "false")
+	rlog.SetLogLevel("ERROR")
+
+	// 初始化 RocketMQ NameServer 配置
+	initRocketMQConfig()
+
 	// 设置简洁的日志格式
 	logrus.SetFormatter(&logrus.TextFormatter{
 		DisableTimestamp:       true,
@@ -32,13 +48,6 @@ func main() {
 
 	// 设置日志级别为Info，但只显示我们自己的日志
 	logrus.SetLevel(logrus.InfoLevel)
-
-	// 完全禁用RocketMQ客户端内部日志
-	os.Setenv("rocketmq.client.logLevel", "OFF")
-	os.Setenv("rocketmq.client.logRoot", "/dev/null")
-	os.Setenv("rocketmq.client.logFileMaxSize", "0")
-	os.Setenv("rocketmq.client.logFileMaxIndex", "0")
-	os.Setenv("rocketmq.client.logUseSlf4j", "false")
 
 	// 禁用标准库日志
 	log.SetOutput(os.Stderr)
@@ -61,6 +70,37 @@ func main() {
 	logrus.Info("=== 所有测试完成 ===")
 	printTestSummary()
 	select {}
+}
+
+// 初始化 RocketMQ 配置
+func initRocketMQConfig() {
+	readerAccessKey := os.Getenv("ROCKETMQ_READER_ACCESS_KEY")
+	readerSecretKey := os.Getenv("ROCKETMQ_READER_SECRET_KEY")
+	adminAccessKey := os.Getenv("ROCKETMQ_ADMIN_ACCESS_KEY")
+	adminSecretKey := os.Getenv("ROCKETMQ_ADMIN_SECRET_KEY")
+	nameServEnv := os.Getenv("ROCKETMQ_NAMESERVER")
+	if readerAccessKey == "" || readerSecretKey == "" || adminAccessKey == "" || adminSecretKey == "" || nameServEnv == "" {
+		logrus.Errorf("环境变量 ROCKETMQ_READER_ACCESS_KEY 或 ROCKETMQ_READER_SECRET_KEY 或 ROCKETMQ_ADMIN_ACCESS_KEY 或 ROCKETMQ_ADMIN_SECRET_KEY 未设置")
+		os.Exit(1)
+	}
+
+	// 支持多个地址，使用逗号分隔
+	addresses := strings.Split(nameServEnv, ",")
+	for _, addr := range addresses {
+		addr = strings.TrimSpace(addr)
+		if addr != "" {
+			rocketmqNameServ = append(rocketmqNameServ, addr)
+		}
+	}
+
+	readerCredentials = primitive.Credentials{
+		AccessKey: readerAccessKey,
+		SecretKey: readerSecretKey,
+	}
+	adminCredentials = primitive.Credentials{
+		AccessKey: adminAccessKey,
+		SecretKey: adminSecretKey,
+	}
 }
 
 // 打印测试结果汇总
@@ -86,10 +126,10 @@ func test_acl_success() {
 	logrus.Info("🔍 [测试场景1] 使用正确的管理员账号")
 	p, err := rocketmq.NewProducer(
 		producer.WithGroupName("test-admin-group"),
-		producer.WithNameServer([]string{"122.248.211.86:9876"}),
+		producer.WithNameServer(rocketmqNameServ),
 		producer.WithCredentials(primitive.Credentials{
-			AccessKey: "rocketmq2",
-			SecretKey: "12345678",
+			AccessKey: adminCredentials.AccessKey,
+			SecretKey: adminCredentials.SecretKey,
 		}),
 	)
 	if err != nil {
@@ -125,7 +165,7 @@ func test_acl_no_credentials() {
 	logrus.Info("🔍 [测试场景2] 不提供任何账号信息")
 	p, err := rocketmq.NewProducer(
 		producer.WithGroupName("test-no-cred-group"),
-		producer.WithNameServer([]string{"122.248.211.86:9876"}),
+		producer.WithNameServer(rocketmqNameServ),
 		// 故意不设置credentials
 	)
 	if err != nil {
@@ -161,7 +201,7 @@ func test_acl_wrong_credentials() {
 	logrus.Info("🔍 [测试场景3] 使用错误的账号信息")
 	p, err := rocketmq.NewProducer(
 		producer.WithGroupName("test-wrong-cred-group"),
-		producer.WithNameServer([]string{"122.248.211.86:9876"}),
+		producer.WithNameServer(rocketmqNameServ),
 		producer.WithCredentials(primitive.Credentials{
 			AccessKey: "wrongUser",
 			SecretKey: "wrongPassword",
@@ -200,10 +240,10 @@ func test_acl_normal_user() {
 	logrus.Info("🔍 [测试场景4] 使用非管理员账号访问受限资源")
 	p, err := rocketmq.NewProducer(
 		producer.WithGroupName("test-normal-group"),
-		producer.WithNameServer([]string{"122.248.211.86:9876"}),
+		producer.WithNameServer(rocketmqNameServ),
 		producer.WithCredentials(primitive.Credentials{
-			AccessKey: "RocketMQ",
-			SecretKey: "12345678",
+			AccessKey: readerCredentials.AccessKey,
+			SecretKey: readerCredentials.SecretKey,
 		}),
 	)
 	if err != nil {

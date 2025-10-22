@@ -1,10 +1,3 @@
-<!--
- * @Author              : Lihang
- * @Date                : 2025-10-20 15:52:35
- * @Description         : 
- * @Email               : lihang818@foxmail.com
- * @LastEditTime        : 2025-10-20 17:50:27
--->
 ## 部署方式
 
 > 使用RocketMQ的4.9.7版本
@@ -42,8 +35,21 @@ ll
 ```bash
 ln -sf /opt/rocketmq-4.9.7/bin/* /usr/local/bin/
 mqbroker -c /opt/rocketmq-4.9.7/conf/broker.conf 
+
+# 设置环境变量（可选，不设置则使用默认地址）
+export ROCKETMQ_NAMESERVER="<ip>:9876"
+
+# 运行测试程序
 go run main.go
 ```
+
+#### 环境变量说明
+
+- `ROCKETMQ_NAMESERVER`: RocketMQ NameServer 地址
+  - 支持单个地址: `<ip>:9876`
+  - 支持多个地址（逗号分隔）: `192.168.1.1:9876,192.168.1.2:9876`
+  - 支持多个地址（分号分隔）: `192.168.1.1:9876;192.168.1.2:9876`
+  - 如果不设置此环境变量，默认使用: `<ip>:9876`
 
 > 使用systemctl管理，参考 `deploy/systemctl`
 
