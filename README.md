@@ -79,4 +79,4 @@ systemctl enable rocketmq-broker --now
 
 ## Docker 部署
 
-待开发测试完成后，更新此文档
+参考部署脚本：https://github.com/1inuxboy/workspace_script/blob/main/deploy/deploy_all_v1.sh
